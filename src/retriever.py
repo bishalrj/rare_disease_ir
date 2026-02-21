@@ -1,5 +1,5 @@
-import faiss
-from sklearn.preprocessing import normalize
+import pandas as pd
+from sklearn.metrics.pairwise import cosine_similarity
 from .embedder import Embedder
 
 class NeuralRetriever:
@@ -10,17 +10,13 @@ class NeuralRetriever:
 
     def _build_index(self):
         corpus = self.data["description"].tolist()
-        embeddings = self.embedder.encode(corpus)
-        embeddings = normalize(embeddings)
-
-        self.index = faiss.IndexFlatIP(embeddings.shape[1])
-        self.index.add(embeddings)
+        self.embeddings = self.embedder.encode(corpus)
 
     def search(self, query: str, top_k: int = 5):
         q_emb = self.embedder.encode([query])
-        q_emb = normalize(q_emb)
+        scores = cosine_similarity(q_emb, self.embeddings)[0]
 
-        scores, indices = self.index.search(q_emb, top_k)
-        results = self.data.iloc[indices[0]].copy()
-        results["score"] = scores[0]
+        top_idx = scores.argsort()[-top_k:][::-1]
+        results = self.data.iloc[top_idx].copy()
+        results["score"] = scores[top_idx]
         return results
